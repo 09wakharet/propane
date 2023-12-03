@@ -138,7 +138,10 @@ DEVICE_MAPS = {
 
 
 def build_prompt(
-    model_name: str, suffix: str, tokenizer: PreTrainedTokenizer
+    model_name: str, 
+    suffix: str, 
+    tokenizer: PreTrainedTokenizer,
+    invariant_prompt: str = None
 ) -> tuple[torch.Tensor, slice]:
     """
     Given the actual "suffix" (prompt), add in the prefix/suffix for the given instruction tuned model
@@ -160,7 +163,11 @@ def build_prompt(
 
     model_name = MODEL_NAME_OR_PATH_TO_NAME[model_name]
     cur_prompt = PROMPT_TEMPLATES[model_name]["prefix"]
-    suffix_start_idx = max(len(tokenizer(cur_prompt)["input_ids"]) - 1, 0)
+    if invariant_prompt:
+        cur_prompt += invariant_prompt
+
+    # deleted the -1 here TODO
+    suffix_start_idx = max(len(tokenizer(cur_prompt)["input_ids"]), 0)
     cur_prompt += suffix
     suffix_end_idx = len(tokenizer(cur_prompt)["input_ids"])
     cur_prompt += PROMPT_TEMPLATES[model_name]["suffix"]

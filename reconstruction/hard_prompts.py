@@ -177,6 +177,8 @@ class HardReconstructorGCG(Reconstructor):
                 sample.target_prefix_slice.stop - 1,
             )
 
+            # logits is 30 x 50304 x 32 while targets is 30 x 32
+            # TODO logits has a bunch of nan entries for some reason
             loss = loss_fct(logits[:, loss_slice, :].transpose(1, 2), targets)
 
             # Add natural prompt penalty if specified
@@ -388,11 +390,17 @@ class HardReconstructorGCG(Reconstructor):
                         d["prompt"],
                         self.init_prompt_char,
                         self.optim_suffix_len,
-                    )
+                    ) # these contain the correct user prompt and blank suffix
 
-                train_prompt_ids, train_suffix_slice = common.build_prompt(
-                    self.model.config.name_or_path, suffix, self.tokenizer
-                )
+                keep_original_prompt = True
+                if keep_original_prompt:
+                    train_prompt_ids, train_suffix_slice = common.build_prompt(
+                        self.model.config.name_or_path, suffix, self.tokenizer, invariant_prompt = orig_prompt
+                    )
+                else:
+                    train_prompt_ids, train_suffix_slice = common.build_prompt(
+                        self.model.config.name_or_path, suffix, self.tokenizer
+                    )
 
             target_prefix_slice = slice(
                 train_prompt_ids.shape[-1],
