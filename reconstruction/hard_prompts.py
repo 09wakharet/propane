@@ -23,10 +23,10 @@ class FullPrompt:
     Holds a single user prompt, documents, suffix
     """
 
-    prompt_ids: torch.Tensor
-    suffix_slice: slice
-    # The targets are the docs
-    target_prefix_slice: slice
+    prompt_ids: torch.Tensor  # whole prompt without target response
+    suffix_slice: slice # the user query (without template)
+    # The targets are the ground truth docs
+    target_prefix_slice: slice # end of prompt_ids to end of target docs
     target_prefix_ids: torch.Tensor
     prompt_ident: int  # For bookkeeping purposes
 
@@ -228,6 +228,7 @@ class HardReconstructorGCG(Reconstructor):
                 ),
                 dim=1,
             )
+            #full_proposal_input[0] contains the system prompt + user query + ground truth 
             proposal_embs = self.model.get_input_embeddings()(
                 full_proposal_input.to(self.model.device)
             )
@@ -236,9 +237,9 @@ class HardReconstructorGCG(Reconstructor):
                 reduction="none", ignore_index=IGNORE_INDEX
             )
             loss_slice = slice(
-                sample.target_prefix_slice.start - 1,
-                sample.target_prefix_slice.stop - 1,
-            )
+                sample.target_prefix_slice.start,
+                sample.target_prefix_slice.stop,
+            ) # loss slice was 71 to 99 while target_prefix_slice is 72 to 100 
             targets = full_proposal_input[:, sample.target_prefix_slice]
             targets[targets == self.tokenizer.pad_token_id] = IGNORE_INDEX
             loss = loss_fct(
@@ -407,6 +408,13 @@ class HardReconstructorGCG(Reconstructor):
                 train_prompt_ids.shape[-1] + train_docs.shape[-1],
             )
 
+            # prompt_ids didn't contain the trainable suffix
+            # very hacky fix
+#            prompt_ids_with_suffix = d["prompt"] + suffix
+#            prompt_ids_with_suffix = self.tokenizer.encode(prompt_ids_with_suffix, 
+#                                                           return_tensors="pt")
+            prompt_ids_with_suffix = common.build_prompt(
+                        self.model.config.name_or_path, suffix, self.tokenizer, invariant_prompt=orig_prompt)[0]
             data.append(
                 (
                     FullPrompt(
@@ -417,12 +425,12 @@ class HardReconstructorGCG(Reconstructor):
                         prompt_ident=d["id"],
                     ),
                     FullPrompt(
-                        prompt_ids=prompt_ids,
+                        prompt_ids=prompt_ids_with_suffix,
                         suffix_slice=suffix_slice,
                         target_prefix_slice=target_prefix_slice,
                         target_prefix_ids=dev_docs,
                         prompt_ident=d["id"],
-                    ),
+                    ), # TODO this actually doesn't matter since we don't have a validation set
                 )
             )
 
@@ -533,7 +541,7 @@ class HardReconstructorGCG(Reconstructor):
                 )
 
             pbar.set_description(
-                f"Epoch loss:{loss:.2f};Best KL={best_kl:.2f};Curr KL={kl:.2f}+-{std_dev:.2f};Logprob. prompt={log_prob_prompt:.2f}"
+                f"Epoch loss:{loss:.2f};Logprob. prompt={log_prob_prompt:.2f}"
             )
 
         return {

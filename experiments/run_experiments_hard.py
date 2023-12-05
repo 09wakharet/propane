@@ -46,6 +46,7 @@ def reconstructor_worker(
             model_name_or_path, True, [model_split]
         )[0][0]
 
+    # dset 1 doesn't contain the full prompt with trainable suffix
     for dset in rec.datasets:
         results.append(
             rec.train(

@@ -119,7 +119,7 @@ def process_advbench(
     num_samples: int,
     tokenizer: PreTrainedTokenizer # TODO
 ) -> list[tuple[int, str]]:
-
+    
     # parse harmful_behaviors.csv
     json_data = json.load(open(dataset_path, "r"))
     harmful_csv = json_data['payload']['blob']['csv'][1:] # remove first tuple which is ['goal', 'target']
@@ -136,7 +136,7 @@ def process_advbench(
         } 
         for i, (prompt,target) in enumerate(harmful_csv)
         ]
-
+    
     with open(
             os.path.join(
                 args.output_dir,
